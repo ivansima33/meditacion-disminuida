@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meditación Guiada: El Sendero de la Escala Disminuida</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Neutrals - Stone and Sky -->
+    <!-- Application Structure Plan: A single-page application designed as a dedicated meditation player. This structure provides a focused, linear, and distraction-free user flow, essential for a guided meditation. The user is guided through four distinct phases, with interactive visual feedback (a canvas scale visualizer) and clear text prompts. This design prioritizes immersion and ease of use over complex navigation, directly translating the sequential nature of the source meditation script into an intuitive digital experience. An additional, collapsible section for AI interaction is included to offer further exploration of musical concepts post-meditation. Text-to-speech functionality is added for enhanced accessibility and immersion. -->
+    <!-- Visualization & Content Choices: The core content, the meditation script, is presented sequentially as text prompts (Goal: Inform/Guide). A custom Canvas element visualizes the diminished scale's tone-semitono structure (Goal: Organize/Inform), providing interactive feedback without the overhead of a full charting library. Key affirmations are highlighted to reinforce learning (Goal: Inform). The choice of a custom canvas drawing over a library like Chart.js is for simplicity, performance, and a more integrated aesthetic. The Gemini API is integrated to generate textual responses based on user prompts, enhancing conceptual understanding and creative ideation (Goal: Inform/Engage). Text-to-speech (Web Speech API) is used to audibly present the meditation instructions (Goal: Accessibility/Immersion), with an attempt to select a more human and feminine voice. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .fade-in {
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-stone-800 flex items-center justify-center min-h-screen p-4">
+
+    <main id="meditationApp" class="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-6 md:p-10 transition-all duration-500">
+        
+        <div id="welcomeScreen" class="text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-sky-900 mb-2">El Sendero de la Escala Disminuida</h1>
+            <p class="text-stone-600 mb-6">Una meditación guiada para la claridad y maestría sin esfuerzo.</p>
+            <p class="text-stone-500 mb-8 text-sm">Presiona 'Comenzar' para iniciar tu viaje interior.</p>
+            <button id="startButton" class="bg-sky-700 text-white font-bold py-3 px-8 rounded-lg hover:bg-sky-800 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-1 duration-300">
+                Comenzar
+            </button>
+        </div>
+
+        <div id="playerScreen" class="hidden">
+            <header class="text-center mb-6">
+                <h2 id="phaseTitle" class="text-2xl font-bold text-sky-800 transition-all duration-500"></h2>
+                <div class="w-full bg-stone-200 rounded-full h-2.5 mt-4">
+                    <div id="progressBar" class="bg-sky-600 h-2.5 rounded-full transition-all duration-1000 ease-linear" style="width: 0%"></div>
+                </div>
+            </header>
+
+            <section id="contentArea" class="text-center min-h-[150px] flex items-center justify-center mb-6">
+                <p id="instructionText" class="text-lg md:text-xl text-stone-700 leading-relaxed fade-in"></p>
+            </section>
+
+            <section id="visualizer" class="mb-8">
+                <canvas id="scaleCanvas" class="w-full max-w-md mx-auto h-24"></canvas>
+            </section>
+
+            <footer class="flex justify-center items-center flex-col">
+                <div class="flex space-x-4">
+                    <button id="playPauseButton" class="bg-sky-700 text-white w-16 h-16 rounded-full flex items-center justify-center text-3xl shadow-lg hover:bg-sky-800 transition-colors focus:outline-none focus:ring-4 focus:ring-sky-300">
+                        <span id="playIcon">&#9658;</span>
+                        <span id="pauseIcon" class="hidden">||</span>
+                    </button>
+                    <button id="toggleVoiceButton" class="bg-sky-400 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg hover:bg-sky-500 transition-colors focus:outline-none focus:ring-4 focus:ring-sky-300">
+                        <span id="voiceOnIcon">🔊</span>
+                        <span id="voiceOffIcon" class="hidden">🔇</span>
+                    </button>
+                </div>
+                <button id="toggleAiButton" class="bg-sky-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-sky-600 transition-colors shadow-md mt-4">
+                    Explorar con IA
+                </button>
+            </footer>
+
+            <div id="aiInteractionSection" class="hidden mt-8 p-6 bg-sky-50 rounded-lg shadow-inner">
+                <h3 class="text-xl font-bold text-sky-800 mb-4">Explora con la IA ✨</h3>
+                <textarea id="aiPromptInput" class="w-full p-3 rounded-lg border border-sky-200 focus:ring-sky-500 focus:border-sky-500 mb-4 h-28 resize-y text-stone-700" placeholder="Ej: 'Describe el carácter de la escala disminuida' o 'Dame una idea musical con esta escala.'"></textarea>
+                <button id="generateResponseButton" class="bg-sky-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-sky-700 transition-colors shadow-md">
+                    Generar Respuesta ✨
+                </button>
+                <div id="loadingIndicator" class="hidden mt-4 text-sky-700 font-medium">Cargando...</div>
+                <div id="aiResponseDisplay" class="mt-4 p-4 bg-white rounded-lg border border-sky-100 text-stone-700 text-left min-h-[80px] overflow-auto max-h-64">
+                    <!-- AI response will appear here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const meditationScript = [
+            // Fase 1: Relajarse y Conectar con el Silencio
+            { phase: 1, title: "Fase 1: Conexión", text: "Ponte cómodo, siéntate derechito pero sin tensarte. Si no lo has hecho ya, ¡cierra los ojos!", duration: 10000, visual: "reset" },
+            { phase: 1, title: "Fase 1: Conexión", text: "Ahora, respira hondo. Inhala suavemente por la nariz y exhala despacio. Cada respiración es una ola que te lleva más adentro de ti.", duration: 15000 },
+            { phase: 1, title: "Fase 1: Conexión", text: "Con cada exhalación, nota cómo tu cuerpo se relaja más y más. Siente la tensión desaparecer de tu cabeza, cuello y hombros.", duration: 15000 },
+            { phase: 1, title: "Fase 1: Conexión", text: "Siente cómo esa relajación baja por tu espalda, tu pecho, tu barriga, hasta la punta de tus pies.", duration: 15000 },
+            { phase: 1, title: "Fase 1: Conexión", text: "Ahora, inhala hondo y, al exhalar, ¡suelta toda la necesidad de controlar! Simplemente *sé*. Estás entrando en 'El Espacio' creativo.", duration: 15000 },
+            { phase: 1, title: "Fase 1: Conexión", text: "En este espacio, no hay juicios. Deja que cualquier pensamiento pase como una nube. Siente el silencio dentro de ti. Descansa en él.", duration: 15000 },
+
+            // Fase 2: Reconocer y Soltar
+            { phase: 2, title: "Fase 2: Liberación", text: "Ahora, date cuenta de cualquier miedo o crítica que tengas sobre la música o tu aprendizaje.", duration: 10000 },
+            { phase: 2, title: "Fase 2: Liberación", text: "Quizás antes te frustraste. Reconoce esa emoción ahora. ¿Es frustración? ¿Miedo? ¿Impotencia?", duration: 12000 },
+            { phase: 2, title: "Fase 2: Liberación", text: "Siente dónde se aloja esa emoción en tu cuerpo. Permítete sentirlo sin juzgarlo. Es solo energía del pasado.", duration: 12000 },
+            { phase: 2, title: "Fase 2: Liberación", text: "Con humildad, entrega esa resistencia a una mente superior. Di por dentro: 'Te entrego esta carga ahora'.", duration: 15000 },
+            { phase: 2, title: "Fase 2: Liberación", text: "¡Suelta esa emoción! Como si abrieras la mano y dejaras volar un pájaro. Confía en que esa energía se transforma para tu bien.", duration: 15000 },
+
+            // Fase 3: Conectar y Practicar
+            { phase: 3, title: "Fase 3: Práctica Interior", text: "Ahora, con tu mente tranquila, vamos a conectar con la escala disminuida. Siéntela, experiméntala.", duration: 12000, visual: "reset" },
+            { phase: 3, title: "Fase 3: Práctica Interior", text: "Recuerda el patrón: tono, semitono, tono, semitono... Imagina la primera nota y su vibración.", duration: 12000, visual: { note: 0 } },
+            { phase: 3, title: "Fase 3: Práctica Interior", text: "Escucha y siente la siguiente nota, un tono más arriba. Siente esa distancia. Observa, sin juzgar.", duration: 12000, visual: { note: 1, interval: "T" } },
+            { phase: 3, title: "Fase 3: Práctica Interior", text: "Desde ahí, sube un semitono. Siente esa relación más cercana, esa tensión sutil.", duration: 12000, visual: { note: 2, interval: "S" } },
+            { phase: 3, title: "Fase 3: Práctica Interior", text: "Sigue el patrón ascendente: tono, semitono... Siente el ritmo del patrón completo grabándose en tu ser.", duration: 20000, visual: "ascend" },
+            { phase: 3, title: "Fase 3: Práctica Interior", text: "Ahora, baja la escala, sintiendo el mismo patrón al revés. Siente cómo se resuelve y se deshace al bajar.", duration: 20000, visual: "descend" },
+            { phase: 3, title: "Fase 3: Práctica Interior", text: "Recuerda: 'Cada nota que toco es el sonido más hermoso'. Abraza cada intervalo sin resistencia.", duration: 15000, visual: "all" },
+            { phase: 3, title: "Fase 3: Práctica Interior", text: "Imagínate en 'El Espacio' interior, y deja que la escala fluya a través de ti sin esfuerzo. ¡Simplemente *pasa*!", duration: 15000 },
+            { phase: 3, title: "Fase 3: Práctica Interior", text: "Repite mentalmente: 'Reconozco cada intervalo con claridad y facilidad. Siento la esencia de cada relación sonora.'", duration: 18000 },
+
+            // Fase 4: Integrar y Agradecer
+            { phase: 4, title: "Fase 4: Integración", text: "Quédate un momento sintiendo cómo tu cuerpo y mente están cambiando, adaptándose a esta nueva realidad musical.", duration: 15000, visual: "reset" },
+            { phase: 4, title: "Fase 4: Integración", text: "Siente una gratitud profunda por la claridad, por la facilidad, por la maestría que estás cultivando.", duration: 15000 },
+            { phase: 4, title: "Fase 4: Integración", text: "Confía. No intentes controlar el 'cómo'. Espera lo inesperado. La música y las oportunidades te encontrarán.", duration: 15000 },
+            { phase: 4, title: "Fase 4: Integración", text: "Cuando estés listo, empieza a volver a la sala, a tu cuerpo. Lleva esta energía contigo al resto de tu día.", duration: 15000 },
+            { phase: 4, title: "Fase 4: Integración", text: "Despacio, cuando quieras, puedes abrir los ojos.", duration: 10000 },
+            { phase: 4, title: "Fase 4: Integración", text: "Meditación completada.", duration: 5000, last: true }
+        ];
+
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const playerScreen = document.getElementById('playerScreen');
+        const startButton = document.getElementById('startButton');
+        
+        const phaseTitle = document.getElementById('phaseTitle');
+        const instructionText = document.getElementById('instructionText');
+        const progressBar = document.getElementById('progressBar');
+        const playPauseButton = document.getElementById('playPauseButton');
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
+        const toggleVoiceButton = document.getElementById('toggleVoiceButton');
+        const voiceOnIcon = document.getElementById('voiceOnIcon');
+        const voiceOffIcon = document.getElementById('voiceOffIcon');
+        const toggleAiButton = document.getElementById('toggleAiButton');
+        const aiInteractionSection = document.getElementById('aiInteractionSection');
+        const aiPromptInput = document.getElementById('aiPromptInput');
+        const generateResponseButton = document.getElementById('generateResponseButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const aiResponseDisplay = document.getElementById('aiResponseDisplay');
+
+        const canvas = document.getElementById('scaleCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let currentStep = 0;
+        let isPlaying = false;
+        let timerId = null;
+        let isVoiceEnabled = true;
+        const totalPhases = 4;
+
+        const synth = window.speechSynthesis;
+        let utterance = new SpeechSynthesisUtterance();
+        utterance.lang = 'es-ES';
+
+        // Function to set a more human/feminine voice
+        function setSpanishFemaleVoice() {
+            const voices = synth.getVoices();
+            let selectedVoice = null;
+
+            // Prioritize Google voices or specific names if available
+            const preferredVoiceNames = [
+                "Google español", // Generic Google Spanish voice
+                "Google español de Estados Unidos", // Google US Spanish
+                "Google español de México", // Google Mexican Spanish
+                "Google español de España", // Google Spain Spanish
+                "Microsoft Helena - Spanish (Spain)", // Microsoft voice
+                "Monica" // Common female voice name
+            ];
+
+            for (const name of preferredVoiceNames) {
+                selectedVoice = voices.find(voice => voice.lang === 'es-ES' && voice.name.includes(name) && voice.gender !== 'male');
+                if (selectedVoice) break;
+            }
+
+            // Fallback: find any female or neutral Spanish voice
+            if (!selectedVoice) {
+                selectedVoice = voices.find(voice => voice.lang === 'es-ES' && (voice.gender === 'female' || !voice.gender));
+            }
+            
+            // Final fallback: any Spanish voice
+            if (!selectedVoice) {
+                selectedVoice = voices.find(voice => voice.lang === 'es-ES');
+            }
+
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            } else {
+                console.warn("No se encontró una voz femenina en español. Usando la voz predeterminada.");
+            }
+        }
+
+        // Event listener for when voices are loaded/changed
+        synth.onvoiceschanged = setSpanishFemaleVoice;
+        // Call it immediately in case voices are already loaded
+        setSpanishFemaleVoice();
+
+
+        function initializeApp() {
+            startButton.addEventListener('click', () => {
+                welcomeScreen.classList.add('hidden');
+                playerScreen.classList.remove('hidden');
+                playerScreen.classList.add('fade-in');
+                startMeditation();
+            });
+
+            playPauseButton.addEventListener('click', togglePlayPause);
+            toggleVoiceButton.addEventListener('click', toggleVoice);
+            toggleAiButton.addEventListener('click', toggleAiSection);
+            generateResponseButton.addEventListener('click', generateLLMResponse);
+
+            setupCanvas();
+            window.addEventListener('resize', setupCanvas);
+        }
+
+        function startMeditation() {
+            currentStep = 0;
+            isPlaying = true;
+            updatePlayPauseButton();
+            runStep();
+        }
+
+        function togglePlayPause() {
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                runStep();
+            } else {
+                clearTimeout(timerId);
+                synth.cancel();
+            }
+            updatePlayPauseButton();
+        }
+        
+        function updatePlayPauseButton() {
+            if(isPlaying) {
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+            } else {
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+            }
+        }
+
+        function toggleVoice() {
+            isVoiceEnabled = !isVoiceEnabled;
+            if (isVoiceEnabled) {
+                voiceOnIcon.classList.remove('hidden');
+                voiceOffIcon.classList.add('hidden');
+                if (isPlaying) {
+                    speakCurrentInstruction();
+                }
+            } else {
+                voiceOnIcon.classList.add('hidden');
+                voiceOffIcon.classList.remove('hidden');
+                synth.cancel();
+            }
+        }
+
+        function speakCurrentInstruction() {
+            if (isVoiceEnabled) {
+                synth.cancel();
+                utterance.text = instructionText.textContent;
+                synth.speak(utterance);
+            }
+        }
+
+        function toggleAiSection() {
+            aiInteractionSection.classList.toggle('hidden');
+        }
+
+        async function generateLLMResponse() {
+            const prompt = aiPromptInput.value;
+                if (!prompt.trim()) {
+                aiResponseDisplay.textContent = "Por favor, escribe tu pregunta o idea.";
+                return;
+            }
+
+            loadingIndicator.classList.remove('hidden');
+            aiResponseDisplay.textContent = '';
+            generateResponseButton.disabled = true;
+
+            try {
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    aiResponseDisplay.textContent = text;
+                } else {
+                    aiResponseDisplay.textContent = "No se pudo generar una respuesta. Intenta de nuevo.";
+                }
+            } catch (error) {
+                console.error("Error al llamar a la API de Gemini:", error);
+                aiResponseDisplay.textContent = "Ocurrió un error al generar la respuesta. Por favor, inténtalo de nuevo más tarde.";
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                generateResponseButton.disabled = false;
+            }
+        }
+
+        function runStep() {
+            if (currentStep >= meditationScript.length) {
+                isPlaying = false;
+                updatePlayPauseButton();
+                return;
+            }
+
+            const step = meditationScript[currentStep];
+            
+            phaseTitle.textContent = step.title;
+            instructionText.innerHTML = step.text;
+            instructionText.classList.remove('fade-in');
+            void instructionText.offsetWidth; 
+            instructionText.classList.add('fade-in');
+            
+            speakCurrentInstruction();
+
+            const progressPercentage = ((currentStep + 1) / meditationScript.length) * 100;
+            progressBar.style.width = `${progressPercentage}%`;
+            
+            drawScale(step.visual);
+            
+            if (step.last) {
+                 isPlaying = false;
+                 updatePlayPauseButton();
+                 synth.cancel();
+                 setTimeout(() => {
+                    playerScreen.classList.add('hidden');
+                    welcomeScreen.classList.remove('hidden');
+                    welcomeScreen.classList.add('fade-in');
+                    startButton.textContent = "Comenzar de Nuevo";
+                    aiInteractionSection.classList.add('hidden'); 
+                 }, 5000);
+                 return;
+            }
+
+            if (isPlaying) {
+                timerId = setTimeout(() => {
+                    currentStep++;
+                    runStep();
+                }, step.duration);
+            }
+        }
+        
+        function setupCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            drawScale("reset");
+        }
+
+        function drawScale(visualData) {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const numNotes = 8;
+            const radius = 12;
+            const startX = width * 0.1;
+            const endX = width * 0.9;
+            const yPos = height / 2;
+            const stepX = (endX - startX) / (numNotes - 1);
+            
+            let highlightIndex = -1;
+            let intervalType = null;
+            let mode = 'static';
+
+            if (typeof visualData === 'object' && visualData !== null) {
+                highlightIndex = visualData.note;
+                intervalType = visualData.interval;
+            } else if (typeof visualData === 'string') {
+                mode = visualData;
+            }
+
+            // Draw connecting line
+            ctx.beginPath();
+            ctx.moveTo(startX, yPos);
+            ctx.lineTo(endX, yPos);
+            ctx.strokeStyle = '#d6d3d1'; 
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw notes
+            for (let i = 0; i < numNotes; i++) {
+                const x = startX + i * stepX;
+                ctx.beginPath();
+                ctx.arc(x, yPos, radius, 0, 2 * Math.PI);
+                
+                let isHighlighted = false;
+                if (mode === 'all') {
+                    isHighlighted = true;
+                } else if (mode === 'reset') {
+                    isHighlighted = false;
+                } else if (i === highlightIndex) {
+                    isHighlighted = true;
+                }
+
+                ctx.fillStyle = isHighlighted ? '#0369a1' : '#e7e5e4'; 
+                ctx.fill();
+                ctx.strokeStyle = '#075985'; 
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            // Draw ascending/descending/interval animation
+            if (mode === 'ascend' || mode === 'descend') {
+                animateScale(mode);
+            } else if (intervalType) {
+                drawInterval(highlightIndex, intervalType);
+            }
+        }
+        
+        let animationFrameId;
+        function animateScale(direction) {
+            cancelAnimationFrame(animationFrameId);
+            let start = null;
+            const duration = 2000;
+            const numNotes = 8;
+            const startX = canvas.clientWidth * 0.1;
+            const stepX = (canvas.clientWidth * 0.8) / (numNotes - 1);
+            const yPos = canvas.clientHeight / 2;
+
+            const animationStep = (timestamp) => {
+                if (!start) start = timestamp;
+                const progress = timestamp - start;
+                const percentage = Math.min(progress / duration, 1);
+                
+                const currentIndex = Math.floor(percentage * numNotes);
+                
+                drawScale({ note: direction === 'ascend' ? currentIndex : numNotes - 1 - currentIndex });
+
+                if (progress < duration) {
+                    animationFrameId = requestAnimationFrame(animationStep);
+                } else {
+                    drawScale({note: -1}); 
+                }
+            };
+            animationFrameId = requestAnimationFrame(animationStep);
+        }
+
+        function drawInterval(index, type) {
+            if (index < 1) return;
+            const startX = canvas.clientWidth * 0.1;
+            const stepX = (canvas.clientWidth * 0.8) / 7;
+            const yPos = canvas.clientHeight / 2;
+            const arcY = yPos - 30;
+
+            const x1 = startX + (index - 1) * stepX;
+            const x2 = startX + index * stepX;
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, yPos - 12);
+            ctx.quadraticCurveTo((x1 + x2) / 2, arcY, x2, yPos - 12);
+            ctx.strokeStyle = '#0ea5e9'; 
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#0c4a6e'; 
+            ctx.font = 'bold 14px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText(type, (x1 + x2) / 2, arcY - 5);
+        }
+
+
+        initializeApp();
+    </script>
+</body>
+</html>
